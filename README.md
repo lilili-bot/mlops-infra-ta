@@ -1,35 +1,113 @@
-# Terraform GKE Setup 
+# FastAPI OpenTelemetry Project
 
-This repository contains the Terraform configuration to deploy GKE clusters for staging and production environments on Google Cloud Platform.
+## Summary
+
+This project demonstrates how to effectively integrate FastAPI with OpenTelemetry to achieve enhanced observability. By combining FastAPI with OpenTelemetry and Grafana, you gain several advantages:
+
+- **Simplified Instrumentation:** The project includes minimal customized instrumentation with OpenTelemetry, showcasing how easy it is to get started.
+- **Flexibility:** The setup allows for flexible and extensible monitoring infrastructure management, enabling easy adjustments and scalability.
+- **Enhanced Observability:** Leverage distributed tracing and monitoring to gain deep insights into your application's performance and behavior.
+- **Near Real-time Visualization:** Use Grafana dashboards to visualize metrics and traces in real-time, providing quick feedback and alerting capabilities.
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Infrastructure Setup](#infrastructure-setup)
+- [Seceret management](#Secret Management)
+- [Service Deployment](#service-deployment)
+- [Monitoring and Tracing](#monitoring-and-tracing)
+- [To do](#To do)
 
 ## Prerequisites
 
-- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install)
+Before you begin, ensure you have the following installed:
+
 - [Terraform](https://www.terraform.io/downloads.html)
-- Service Account JSON Keys for Terraform
+- [Docker](https://www.docker.com/products/docker-desktop)
+- [GCP SDK](https://cloud.google.com/sdk/install)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Google Artifactory](https://cloud.google.com/artifact-registry/docs)
+- [GCS](https://cloud.google.com/storage/docs)
 
+## Infrastructure Setup
 
-## Setup Instructions
+1. **Authenticate with GCP:**
+    ```sh
+    gcloud auth login
+    gcloud auth application-default login
+    ```
+2. **Set Environment Variables:**
 
-### Local Development
+    Export the necessary environment variables for Terraform:
+    ```sh
+    export TF_VAR_gcp_credentials_json="path/to/your/credentials.json"
+    export TF_VAR_project_id="your-gcp-project-id"
+    export TF_VAR_region="your-gcp-region"
+    ```
+3. **Initialize Terraform:**
+    ```sh
+    terraform init -backend-config="gke-infra/terraform/backend_configs/staging-backend-config.hcl"
+    ```
 
-1. **Clone the repository:**
+3. **Create Infrastructure:**
+    ```sh
+    terraform apply -var-file="gke-infra/terraform/envs/staging.tfvars"
+    ```
 
-   ```sh
-   git clone https://github.com/yourusername/your-repo.git
-   cd your-repo
-   ```
-2. **Authenticate your service account
-```
-gcloud auth activate-service-account --key-file=path/to/your/terraform-key.json
-```
-3. **export envs
-export GOOGLE_CREDENTIALS=$(cat path/to/your/terraform-key.json)
-export TF_VAR_gcp_credentials_json="$GOOGLE_CREDENTIALS"
-4. Terraform
-```
-terraform init -backend-config="terraform/backend_configs/staging-backend-config.hcl"
-terraform plan -var-file="terraform/envs/staging.tfvars"
-```
-Please be careful with terraform apply, because it will deploy GKE cluster with one node.
+    This will create the necessary GKE cluster, deploy the OpenTelemetry Collector and the Grafana instance.
 
+## Secret Management
+
+Before deploying the FastAPI service, create the necessary secrets to pass them as variables to the service.
+
+1. **Create Secrets** (example using `kubectl`):
+    ```sh
+    kubectl create secret generic otel-endpoint --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT=<your otel-collector endpoind>
+    --namespace=otel-col
+    ```
+    note: the endpoint is <service-name>.<namespace>.svc.cluster.local
+
+## Service Deployment
+
+1. **Build and Push Docker Image:**
+    ```sh
+    docker build --platform linux/amd64 -t fastapi-otel:v2.0 .
+    docker tag fastapi-otel:v2.0 <your-artifact-registry-rep>/<your-service-name:version>
+    docker push <your-artifact-registry-rep>/<your-service-name:version>
+    ```
+
+2. **Deploy to GKE Cluster:**
+    ```sh
+    kubectl apply -f deployment.yaml
+    ```
+
+    Update the `deployment.yaml` file to include the correct image path from Google Artifactory.
+
+## Monitoring and Tracing
+
+The FastAPI service is instrumented with OpenTelemetry, allowing for distributed tracing and monitoring.
+
+1. **Configure OpenTelemetry Collector:**
+
+    See gke-infra/deploy/otel-collector/values.yaml
+
+2. **Access Metrics in Grafana cloud:**
+
+    Assume you have already Grafana Cloud set up. Stack created, credential set up, enabled OpenTelemetry Connection
+    Reference documentation: https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/
+
+4. **Configure Grafana Datasource:**
+    
+    * There will be datasource automatically available based on the connection set in pervious step.
+    * For metrics, go to default datasource connection, details see below image.
+    ![Image description](readme.png)
+
+5. **Create Dashboards:**
+
+    You can now create custom dashboards in Grafana to visualize the metrics collected by OpenTelemetry.
+
+## To do
+
+* Set up alert via Grafana API.
+* Customised more instrumentation for fastapi as well as for possible backends, such as postgress, redis, rocksdb.
+* Migrate all GCP deployment to terraform.

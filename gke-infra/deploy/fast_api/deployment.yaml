@@ -1,0 +1,45 @@
+# fastapi deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-app
+  namespace: otel-col
+  labels:
+    app: fastapi-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fastapi-app
+  template:
+    metadata:
+      labels:
+        app: fastapi-app
+    spec:
+      containers:
+      - name: fastapi-app
+        image: "europe-west1-docker.pkg.dev/mlops-demo-ll-dev/mlops-demo/demo-fastapi-app:latest"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        env:
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: otel-endpoint
+              key: OTEL_EXPORTER_OTLP_ENDPOINT
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-app
+  namespace: otel-col
+spec:
+  selector:
+    app: fastapi-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP

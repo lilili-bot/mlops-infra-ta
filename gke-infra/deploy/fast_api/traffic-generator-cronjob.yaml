@@ -1,0 +1,53 @@
+# For automatically traffic simulation.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: traffic-generator
+  namespace: otel-col
+spec:
+  schedule: "*/5 * * * *"  # Schedule traffic generation every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - fastapi-app
+                topologyKey: "kubernetes.io/hostname"
+          containers:
+          - name: traffic-generator
+            image: curlimages/curl:7.73.0-alpine  # Use an Alpine image with curl
+            command: ["/bin/sh", "-c"]
+            args:
+              - |
+                FASTAPI_SERVICE=http://fastapi-app
+
+                get_request() {
+                  i=\$1
+                  response=\$(curl -s -o /dev/null -w \"%{http_code}\" \$FASTAPI_SERVICE/items/\${i}?q=example)
+                  echo \"GET /items/\${i} - Status: \$response\"
+                }
+
+                post_request() {
+                  json_data=\$1
+                  response=\$(curl -s -o /dev/null -w \"%{http_code}\" -X POST \$FASTAPI_SERVICE/items/ -H \"Content-Type: application/json\" -d \"\$json_data\")
+                  echo \"POST /items/ - Status: \$response\"
+                }
+
+                # Get Requests
+                for i in 1 2 3 4 5; do
+                  get_request \$i
+                  sleep 1
+                done
+
+                # Post Requests
+                post_request '{\"name\":\"Item1\", \"price\": 10.5}'
+                post_request '{\"name\":\"Item2\", \"price\": 23.0}'
+                post_request '{\"name\":\"Item3\", \"price\": 7.99}'
+          restartPolicy: OnFailure

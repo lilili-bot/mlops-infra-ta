@@ -1,0 +1,126 @@
+# deploy otel-collector as daemonset with open-telemetry k8s.
+mode: daemonset
+
+image:
+  repository: "otel/opentelemetry-collector-k8s"
+namespaceOverride: "otel-col"
+config:
+  extensions:
+    health_check:
+      endpoint: ${env:MY_POD_IP}:13133
+    basicauth/grafana_cloud:
+      client_auth:
+        username: ${env:GRAFANA_USERNAME}
+        password: ${env:GRAFANA_PASSWORD}
+
+  processors:
+    batch:
+      timeout: 10s
+      send_batch_size: 512
+      send_batch_max_size: 512
+    memory_limiter:
+      limit_mib: 500
+      spike_limit_mib: 150
+      check_interval: 5s
+    resourcedetection:
+      detectors: ["env", "system"]
+      override: false
+    transform/add_resource_attributes_as_metric_attributes:
+      error_mode: ignore
+      metric_statements:
+        - context: datapoint
+          statements:
+            - set(attributes["deployment.environment"], resource.attributes["deployment.environment"])
+            - set(attributes["service.version"], resource.attributes["service.version"])
+
+  exporters:
+    otlphttp/grafana_cloud:
+      endpoint: "https://otlp-gateway-prod-eu-west-2.grafana.net/otlp"
+      auth:
+        authenticator: basicauth/grafana_cloud
+      
+
+  service:
+    extensions: [basicauth/grafana_cloud, health_check]
+    pipelines:
+      metrics:
+        receivers: [otlp]
+        processors: [batch, memory_limiter, resourcedetection, transform/add_resource_attributes_as_metric_attributes]
+        exporters: [otlphttp/grafana_cloud]
+      traces:
+        receivers: [otlp]
+        processors: [batch, memory_limiter]
+        exporters: [otlphttp/grafana_cloud]
+
+# pass two more environment variables username and password for grafana authentication.
+extraEnvs:
+  - name: GRAFANA_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: grafana-auth
+        key: username
+  - name: GRAFANA_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: grafana-auth
+        key: password 
+resources:
+  limits:
+    cpu: 250m
+    memory: 512Mi
+
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+service:
+  enabled: true
+clusterRole:
+  create: true
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - pods
+        - namespaces
+      verbs:
+        - get
+        - list
+        - watch
+    - apiGroups:
+        - extensions
+        - networking.k8s.io
+      resources:
+        - ingresses/status
+        - ingresses
+        - replicasets
+      verbs:
+        - get
+        - list
+        - watch
+    # For events
+    - apiGroups:
+      - events.k8s.io
+      resources:
+        - events
+      verbs:
+        - watch
+        - list
+
+livenessProbe:
+  initialDelaySeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 3
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3

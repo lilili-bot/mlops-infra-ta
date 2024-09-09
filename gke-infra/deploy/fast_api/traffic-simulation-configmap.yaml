@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traffic-simulation-script
+  namespace: otel-col
+data:
+  traffic_simulation.sh: |
+    #!/bin/sh
+
+    FASTAPI_SERVICE=http://fastapi-app
+
+    get_request() {
+      i=$1
+      response="$(curl -s -o /dev/null -w \"%{http_code}\" $FASTAPI_SERVICE/items/${i}?q=example)"
+      echo "GET /items/${i} - Status: $response"
+    }
+
+    post_request() {
+      json_data=$1
+      response="$(curl -s -o /dev/null -w \"%{http_code}\" -X POST $FASTAPI_SERVICE/items/ -H \"Content-Type: application/json\" -d \"$json_data\")"
+      echo "POST /items/ - Status: $response"
+    }
+
+    while true; do
+      # Get Requests
+      for i in 1 2 3 4 5; do
+          get_request $i
+          sleep 1
+      done
+
+      # Post Requests
+      post_request '{"name":"Item1", "price": 10.5}'
+      post_request '{"name":"Item2", "price": 23.0}'
+      post_request '{"name":"Item3", "price": 7.99}'
+
+      echo "Sleeping for 5 minutes..."
+      sleep 300 # Sleep for 300 seconds (5 minutes)
+    done

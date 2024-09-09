@@ -13,7 +13,8 @@ This project demonstrates how to effectively integrate FastAPI with OpenTelemetr
 
 - [Prerequisites](#prerequisites)
 - [Infrastructure Setup](#infrastructure-setup)
-- [Seceret management](#Secret Management)
+- [Seceret management](#secret-management)
+-  [oTelCol deployment](#deploy-otel-collector-daemonset)
 - [Service Deployment](#service-deployment)
 - [Monitoring and Tracing](#monitoring-and-tracing)
 - [To do](#To do)
@@ -70,7 +71,7 @@ Before deploying the FastAPI service, create the necessary secrets to pass them 
     ```
     note: the otel-col endpoint is <otel-collector-service-name>.<your-namespace>.svc.cluster.local
 
-## Deploy otel-collector daemonsets
+## Deploy otel-collector daemonset
     ```
     helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
     helm install otel-collector open-telemetry/opentelemetry-collector -f values.yaml

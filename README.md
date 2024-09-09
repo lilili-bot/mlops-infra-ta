@@ -17,7 +17,7 @@ This project demonstrates how to effectively integrate FastAPI with OpenTelemetr
 -  [oTelCol deployment](#deploy-otel-collector-daemonset)
 - [Service Deployment](#service-deployment)
 - [Monitoring and Tracing](#monitoring-and-tracing)
-- [To do](#To do)
+- [To do](#to-do)
 
 ## Prerequisites
 

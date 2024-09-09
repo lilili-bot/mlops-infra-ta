@@ -1,0 +1,59 @@
+name: 'Terraform Workflow'
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [staging, prod]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v2
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      run: |
+        if [ "${{ matrix.environment }}" == "staging" ]; then
+          echo "${{ secrets.GOOGLE_CREDENTIALS_STAGING }}" > ${{ runner.temp }}/gcp-key.json
+          export GOOGLE_CREDENTIALS=$(cat ${{ runner.temp }}/gcp-key.json)
+        elif [ "${{ matrix.environment }}" == "prod" ]; then
+          echo "${{ secrets.GOOGLE_CREDENTIALS_PROD }}" > ${{ runner.temp }}/gcp-key.json
+          export GOOGLE_CREDENTIALS=$(cat ${{ runner.temp }}/gcp-key.json)
+        fi
+
+    - name: Configure GCP Credentials
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-key.json
+      run: gcloud auth activate-service-account --key-file=${{ runner.temp }}/gcp-key.json
+
+    - name: Initialize Terraform
+      env:
+        GOOGLE_CREDENTIALS: ${{ runner.temp }}/gcp-key.json
+        TF_VAR_gcp_credentials_json: ${{ runner.temp }}/gcp-key.json
+        TF_VAR_project_id: ${{ secrets.PROJECT_ID }}
+        TF_VAR_region: "us-central1"
+      run: |
+        if [ "${{ matrix.environment }}" == "staging" ]; then
+          terraform init -backend-config="terraform/backend_configs/staging-backend-config.hcl"
+        elif [ "${{ matrix.environment }}" == "prod" ]; then
+          terraform init -backend-config="terraform/backend_configs/prod-backend-config.hcl"
+        fi
+
+    - name: Terraform Plan
+      env:
+        GOOGLE_CREDENTIALS: ${{ runner.temp }}/gcp-key.json
+        TF_VAR_gcp_credentials_json: ${{ runner.temp }}/gcp-key.json
+        TF_VAR_project_id: ${{ secrets.PROJECT_ID }}
+        TF_VAR_region: "us-central1"
+      run: |
+        if [ "${{ matrix.environment }}" == "

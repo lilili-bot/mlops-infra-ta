@@ -1,12 +1,12 @@
 provider "google" {
-  credentials = file("path/to/your/terraform-key.json")
-  project     = "your-project-id"
-  region      = "us-central1"  # Choose your preferred region
+  credentials = var.gcp_credentials_json
+  project     = var.project_id
+  region      = var.region
 }
 
 resource "google_container_cluster" "primary" {
   name     = "primary-cluster"
-  location = "us-central1"    # Change to your desired region
+  location = var.region
 
   initial_node_count = 1
 
@@ -16,5 +16,12 @@ resource "google_container_cluster" "primary" {
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform",
     ]
+  }
+}
+
+terraform {
+  backend "gcs" {
+    bucket  = "your-bucket-name"
+    prefix  = "terraform/state"
   }
 }

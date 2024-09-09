@@ -8,7 +8,8 @@ variable "region" {
   type        = string
 }
 
-variable "credentials_file" {
-  description = "Path to the service account key file"
+variable "gcp_credentials_json" {
+  description = "Path to the GCP credentials JSON file"
   type        = string
+  default     = ""
 }

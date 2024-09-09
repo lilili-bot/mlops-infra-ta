@@ -61,11 +61,24 @@ Before you begin, ensure you have the following installed:
 Before deploying the FastAPI service, create the necessary secrets to pass them as variables to the service.
 
 1. **Create Secrets** (example using `kubectl`):
+    In this repo, all the gke resources are build namespace otel-col. You could use your own namespace, such as monitoring-demo.
     ```sh
     kubectl create secret generic otel-endpoint --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT=<your otel-collector endpoind>
     --namespace=otel-col
+
+    kubectl create secret generic grafana-auth --from-literal=username="<your-grafana-cloud-instant-name>" --from-literal=password="<your grafana access token>" -n <your-name-space>
     ```
-    note: the endpoint is <service-name>.<namespace>.svc.cluster.local
+    note: the otel-col endpoint is <otel-collector-service-name>.<your-namespace>.svc.cluster.local
+
+## Deploy otel-collector daemonsets
+    ```
+    helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+    helm install otel-collector open-telemetry/opentelemetry-collector -f values.yaml
+    ```
+    Verify if the pods are created.
+    ```
+    ./check_pod_all_logs.sh 
+    ```
 
 ## Service Deployment
 
@@ -77,11 +90,26 @@ Before deploying the FastAPI service, create the necessary secrets to pass them 
     ```
 
 2. **Deploy to GKE Cluster:**
+    Update the `deployment.yaml` file to include the correct image path from Google Artifactory.
     ```sh
+    cd gke-infra/deploy/fast_api
     kubectl apply -f deployment.yaml
     ```
-
-    Update the `deployment.yaml` file to include the correct image path from Google Artifactory.
+    deploy debug pod with traffic simulation script
+    ```
+    kubectl apply -f alpine-pod.yaml
+    kubectl apply -f traffic-simulation-configmap.yaml
+    ```
+    login to the pod
+    ```
+    kubectl exec -it apline-curl -n otel-col -- sh
+    cd script
+    traffic_simulation.sh
+    ```
+    You should see some 200 and 422 responses from service. To check details you could check the log of the service pod. The metics which we custimised with open-telemetry export also to pod log, for debuging purpose.
+    ```
+    kubectl logs -f <name-of-fast-api-service-pod>  -n otel-col
+    ```
 
 ## Monitoring and Tracing
 
@@ -103,7 +131,6 @@ The FastAPI service is instrumented with OpenTelemetry, allowing for distributed
     ![Image description](readme.png)
 
 5. **Create Dashboards:**
-
     You can now create custom dashboards in Grafana to visualize the metrics collected by OpenTelemetry.
 
 ## To do
